@@ -1,6 +1,7 @@
 ﻿'use client';
 
-import { FormEvent, useMemo, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { apiRequest } from "@/lib/api-client";
 
@@ -44,38 +45,60 @@ export default function MembersPage() {
 
   const yearOptions = useMemo(() => buildYearOptions(10), []);
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const fetchMembers = useCallback(
+    async (targetYear: string) => {
+      if (!targetYear) {
+        setError("กรุณาเลือกปีที่เข้าเรียน");
+        return;
+      }
 
-    if (!year) {
-      setError("Please enter an enrollment year");
+      if (!isReady || !user) {
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const response = await apiRequest<MembersResponse>({
+          path: `/classroom/class?year=${encodeURIComponent(targetYear)}`,
+          method: "GET",
+        });
+
+        setMembers(response.data);
+      } catch (apiError) {
+        const message =
+          typeof apiError === "object" && apiError !== null && "message" in apiError
+            ? String((apiError as { message: unknown }).message)
+            : "ไม่สามารถดึงข้อมูลเพื่อนร่วมรุ่นได้";
+        setError(message);
+        setMembers([]);
+      } finally {
+        setIsLoading(false);
+        setHasSearched(true);
+      }
+    },
+    [isReady, user],
+  );
+
+  useEffect(() => {
+    if (!isReady) {
       return;
     }
 
-    if (!isReady) return;
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await apiRequest<MembersResponse>({
-        path: `/classroom/class?year=${encodeURIComponent(year)}`,
-        method: "GET",
-      });
-
-      setMembers(response.data);
-      setHasSearched(true);
-    } catch (apiError) {
-      const message =
-        typeof apiError === "object" && apiError !== null && "message" in apiError
-          ? String((apiError as { message: unknown }).message)
-          : "Unable to fetch class members";
-      setError(message);
+    if (!user) {
       setMembers([]);
-    } finally {
-      setIsLoading(false);
+      setHasSearched(false);
+      return;
     }
-  };
+
+    setHasSearched(false);
+    void fetchMembers(year);
+  }, [fetchMembers, isReady, user, year]);
+
+  useEffect(() => {
+    setError(null);
+  }, [year]);
 
   return (
     <section
@@ -86,6 +109,25 @@ export default function MembersPage() {
         gap: "32px",
       }}
     >
+      <Link
+        href="/profile"
+        style={{
+          alignSelf: "flex-start",
+          display: "inline-flex",
+          gap: "8px",
+          alignItems: "center",
+          padding: "8px 16px",
+          borderRadius: "999px",
+          border: "1px solid rgba(23,23,23,0.12)",
+          background: "#fff",
+          color: "rgba(23,23,23,0.78)",
+          fontWeight: 600,
+          textDecoration: "none",
+        }}
+      >
+        ← ย้อนกลับ
+      </Link>
+
       <header style={{ maxWidth: "760px" }}>
         <p
           style={{
@@ -98,18 +140,17 @@ export default function MembersPage() {
             marginBottom: "16px",
           }}
         >
-          Cohort directory
+          รายชื่อรุ่น
         </p>
         <h1 style={{ fontSize: "clamp(2rem, 4vw, 2.75rem)", marginBottom: "12px" }}>
-          Search classmates by enrollment year
+          ค้นหาเพื่อนร่วมรุ่นตามปีที่เข้าเรียน
         </h1>
         <p style={{ fontSize: "1.05rem", lineHeight: 1.6, color: "rgba(23,23,23,0.7)" }}>
-          Provide a year (CE) to retrieve the classmates list via the <code>/classroom/class</code> endpoint, including majors and school information.
+          เลือกปี (ค.ศ.) เพื่อดูรายชื่อเพื่อนร่วมรุ่นพร้อมข้อมูลสาขาและโรงเรียนจาก API <code>/classroom/class</code>
         </p>
       </header>
 
-      <form
-        onSubmit={handleSubmit}
+      <div
         style={{
           display: "flex",
           flexWrap: "wrap",
@@ -118,26 +159,28 @@ export default function MembersPage() {
         }}
       >
         <label style={{ display: "flex", flexDirection: "column", gap: "8px", minWidth: "220px" }}>
-          <span style={{ fontWeight: 600 }}>Enrollment year (CE)</span>
-          <input
-            type="number"
-            inputMode="numeric"
-            min="1900"
-            max="2100"
+          <span style={{ fontWeight: 600 }}>เลือกปีที่เข้าเรียน (ค.ศ.)</span>
+          <select
             value={year}
             onChange={(event) => setYear(event.target.value)}
-            placeholder="2023"
             style={{
               padding: "12px 16px",
               borderRadius: "12px",
               border: "1px solid rgba(23,23,23,0.12)",
               fontSize: "1rem",
+              background: "#fff",
             }}
-          />
+          >
+            {yearOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
         </label>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-          <span style={{ fontWeight: 600 }}>Quick select</span>
+          <span style={{ fontWeight: 600 }}>เลือกด่วน</span>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
             {yearOptions.map((option) => (
               <button
@@ -158,30 +201,16 @@ export default function MembersPage() {
             ))}
           </div>
         </div>
-
-        <button
-          type="submit"
-          disabled={isLoading}
-          style={{
-            padding: "12px 24px",
-            borderRadius: "999px",
-            fontSize: "1.05rem",
-            fontWeight: 600,
-            border: "none",
-            background: "rgba(48,84,150,1)",
-            color: "#fff",
-            cursor: isLoading ? "not-allowed" : "pointer",
-            opacity: isLoading ? 0.75 : 1,
-          }}
-        >
-          {isLoading ? "Loading..." : "Search"}
-        </button>
-      </form>
+      </div>
 
       {!user && isReady ? (
         <p style={{ color: "#b42318", fontWeight: 500 }}>
-          Please sign in first so we can attach your token to the request.
+          กรุณาเข้าสู่ระบบก่อนเพื่อใช้โทเคนสำหรับดึงข้อมูล
         </p>
+      ) : null}
+
+      {isLoading ? (
+        <p style={{ fontSize: "1.05rem", color: "rgba(23,23,23,0.7)" }}>กำลังโหลดข้อมูล...</p>
       ) : null}
 
       {error ? (
@@ -198,9 +227,9 @@ export default function MembersPage() {
         </div>
       ) : null}
 
-      {hasSearched && !error && members.length === 0 ? (
+      {hasSearched && !error && members.length === 0 && user ? (
         <p style={{ color: "rgba(23,23,23,0.7)", fontSize: "1.05rem" }}>
-          No classmates found for {year}.
+          ไม่พบเพื่อนร่วมรุ่นสำหรับปี {year}
         </p>
       ) : null}
 
@@ -231,17 +260,17 @@ export default function MembersPage() {
               <p style={{ fontSize: "0.95rem", color: "rgba(23,23,23,0.7)" }}>{member.email}</p>
               {member.education?.major ? (
                 <p style={{ fontSize: "0.95rem" }}>
-                  <strong>Major:</strong> {member.education.major}
+                  <strong>สาขา:</strong> {member.education.major}
                 </p>
               ) : null}
               {member.education?.studentId ? (
                 <p style={{ fontSize: "0.95rem" }}>
-                  <strong>Student ID:</strong> {member.education.studentId}
+                  <strong>รหัสนักศึกษา:</strong> {member.education.studentId}
                 </p>
               ) : null}
               {member.education?.school?.name ? (
                 <p style={{ fontSize: "0.95rem" }}>
-                  <strong>School:</strong> {member.education.school.name}
+                  <strong>โรงเรียน:</strong> {member.education.school.name}
                   {member.education.school.province ? `, ${member.education.school.province}` : ""}
                 </p>
               ) : null}

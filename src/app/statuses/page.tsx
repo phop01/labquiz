@@ -1,5 +1,6 @@
 ﻿'use client';
 
+import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { apiRequest } from "@/lib/api-client";
@@ -40,9 +41,9 @@ interface StatusMutationResponse {
 }
 
 function displayName(source: StatusItem["createdBy"]) {
-  if (!source) return "Unknown";
+  if (!source) return "ไม่ทราบ";
   if (typeof source === "string") return source;
-  return source.name ?? source.email ?? "Unknown";
+  return source.name ?? source.email ?? "ไม่ทราบ";
 }
 
 function formatDate(value?: string) {
@@ -97,6 +98,45 @@ function normalizeStatus(
   };
 }
 
+function withPreservedAuthors(next: StatusItem, previous?: StatusItem): StatusItem {
+  if (!previous) {
+    return next;
+  }
+
+  let mergedComments = next.comment;
+  if (next.comment && next.comment.length > 0 && previous.comment && previous.comment.length > 0) {
+    const previousById = new Map(previous.comment.map((comment) => [comment._id, comment]));
+    mergedComments = next.comment.map((comment) => {
+      if (typeof comment.createdBy === "string") {
+        const previousComment = previousById.get(comment._id);
+        if (
+          previousComment &&
+          previousComment.createdBy &&
+          typeof previousComment.createdBy !== "string"
+        ) {
+          return { ...comment, createdBy: previousComment.createdBy };
+        }
+      }
+      return comment;
+    });
+  }
+
+  const shouldReplaceCreator =
+    typeof next.createdBy === "string" &&
+    previous.createdBy &&
+    typeof previous.createdBy !== "string";
+
+  if (mergedComments !== next.comment || shouldReplaceCreator) {
+    return {
+      ...next,
+      createdBy: shouldReplaceCreator ? previous.createdBy : next.createdBy,
+      comment: mergedComments,
+    };
+  }
+
+  return next;
+}
+
 export default function StatusesPage() {
   const { isReady, user } = useAuth();
   const [statuses, setStatuses] = useState<StatusItem[]>([]);
@@ -126,15 +166,19 @@ export default function StatusesPage() {
         path: "/classroom/status",
         method: "GET",
       });
-      const normalized = (response.data ?? []).map((item) =>
-        normalizeStatus(item, currentUserId, currentUserEmail),
-      );
-      setStatuses(normalized);
+      const incoming = response.data ?? [];
+      setStatuses((prev) => {
+        const previousById = new Map(prev.map((item) => [item._id, item]));
+        return incoming.map((item) => {
+          const normalized = normalizeStatus(item, currentUserId, currentUserEmail);
+          return withPreservedAuthors(normalized, previousById.get(item._id));
+        });
+      });
     } catch (apiError) {
       const message =
         typeof apiError === "object" && apiError !== null && "message" in apiError
           ? String((apiError as { message: unknown }).message)
-          : "Unable to load status feed";
+          : "ไม่สามารถโหลดฟีดสถานะได้";
       setError(message);
     } finally {
       setIsLoading(false);
@@ -148,15 +192,15 @@ export default function StatusesPage() {
 
   const likeLabel = (status: StatusItem) => {
     const count = status.likeCount ?? status.like?.length ?? 0;
-    if (count === 0) return "Be the first to like";
-    if (count === 1) return "1 like";
-    return `${count} likes`;
+    if (count === 0) return "ยังไม่มีใครถูกใจ";
+    if (count === 1) return "1 ถูกใจ";
+    return `${count} ถูกใจ`;
   };
 
   const handlePublish = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!composer.trim()) {
-      setError("Please write something before publishing");
+      setError("กรุณาพิมพ์ข้อความก่อนโพสต์");
       return;
     }
 
@@ -185,7 +229,7 @@ export default function StatusesPage() {
       const message =
         typeof apiError === "object" && apiError !== null && "message" in apiError
           ? String((apiError as { message: unknown }).message)
-          : "Unable to publish status";
+          : "ไม่สามารถโพสต์สถานะได้";
       setError(message);
     } finally {
       setIsPublishing(false);
@@ -218,13 +262,15 @@ export default function StatusesPage() {
         currentUserId,
         currentUserEmail,
       );
-      setStatuses((prev) => prev.map((item) => (item._id === statusId ? normalized : item)));
+      setStatuses((prev) =>
+        prev.map((item) => (item._id === statusId ? withPreservedAuthors(normalized, item) : item)),
+      );
       setCommentDrafts((prev) => ({ ...prev, [statusId]: "" }));
     } catch (apiError) {
       const message =
         typeof apiError === "object" && apiError !== null && "message" in apiError
           ? String((apiError as { message: unknown }).message)
-          : "Unable to add comment";
+          : "ไม่สามารถเพิ่มความคิดเห็นได้";
       setError(message);
     } finally {
       setCommentPending((prev) => ({ ...prev, [statusId]: false }));
@@ -249,7 +295,11 @@ export default function StatusesPage() {
       currentUserEmail,
     );
 
-    setStatuses((prev) => prev.map((item) => (item._id === statusId ? optimisticNext : item)));
+    setStatuses((prev) =>
+      prev.map((item) =>
+        item._id === statusId ? withPreservedAuthors(optimisticNext, item) : item,
+      ),
+    );
 
     try {
       const response = await apiRequest<StatusMutationResponse>({
@@ -267,12 +317,14 @@ export default function StatusesPage() {
         currentUserId,
         currentUserEmail,
       );
-      setStatuses((prev) => prev.map((item) => (item._id === statusId ? normalized : item)));
+      setStatuses((prev) =>
+        prev.map((item) => (item._id === statusId ? withPreservedAuthors(normalized, item) : item)),
+      );
     } catch (apiError) {
       const message =
         typeof apiError === "object" && apiError !== null && "message" in apiError
           ? String((apiError as { message: unknown }).message)
-          : "Unable to update like status";
+          : "ไม่สามารถอัปเดตการกดถูกใจได้";
       setError(message);
       setStatuses((prev) => prev.map((item) => (item._id === statusId ? status : item)));
     } finally {
@@ -283,7 +335,7 @@ export default function StatusesPage() {
   if (!isReady) {
     return (
       <section style={{ padding: "64px min(6vw, 72px)" }}>
-        <p style={{ fontSize: "1.05rem" }}>Loading session...</p>
+        <p style={{ fontSize: "1.05rem" }}>กำลังโหลดเซสชัน...</p>
       </section>
     );
   }
@@ -292,10 +344,10 @@ export default function StatusesPage() {
     return (
       <section style={{ padding: "64px min(6vw, 72px)" }}>
         <h1 style={{ fontSize: "clamp(2rem, 4vw, 2.75rem)", marginBottom: "12px" }}>
-          Status board
+          กระดานสถานะ
         </h1>
         <p style={{ fontSize: "1.05rem", color: "rgba(23,23,23,0.7)" }}>
-          Please sign in to view and interact with statuses.
+          กรุณาเข้าสู่ระบบเพื่อดูและโต้ตอบกับสถานะ
         </p>
       </section>
     );
@@ -311,6 +363,25 @@ export default function StatusesPage() {
         background: "linear-gradient(140deg, rgba(48,84,150,0.06), rgba(156,218,255,0.1))",
       }}
     >
+      <Link
+        href="/profile"
+        style={{
+          alignSelf: "flex-start",
+          display: "inline-flex",
+          gap: "8px",
+          alignItems: "center",
+          padding: "8px 16px",
+          borderRadius: "999px",
+          border: "1px solid rgba(23,23,23,0.12)",
+          background: "#fff",
+          color: "rgba(23,23,23,0.78)",
+          fontWeight: 600,
+          textDecoration: "none",
+        }}
+      >
+        ← ย้อนกลับ
+      </Link>
+
       <header style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
         <p
           style={{
@@ -322,13 +393,13 @@ export default function StatusesPage() {
             color: "rgba(23,23,23,0.78)",
           }}
         >
-          Share updates with your cohort
+          แบ่งปันอัปเดตกับเพื่อนร่วมรุ่น
         </p>
         <h1 style={{ fontSize: "clamp(2.25rem, 5vw, 3rem)", lineHeight: 1.1 }}>
-          Status board
+          กระดานสถานะ
         </h1>
         <p style={{ fontSize: "1.05rem", lineHeight: 1.6, color: "rgba(23,23,23,0.7)" }}>
-          Post quick updates, discuss with classmates, and celebrate each other using like and comment actions.
+          โพสต์อัปเดตสั้น ๆ พูดคุยกับเพื่อนร่วมชั้น และร่วมยินดีด้วยการกดถูกใจและแสดงความคิดเห็น
         </p>
       </header>
 
@@ -345,11 +416,11 @@ export default function StatusesPage() {
         }}
       >
         <label style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-          <span style={{ fontWeight: 600 }}>Create a status</span>
+          <span style={{ fontWeight: 600 }}>สร้างสถานะ</span>
           <textarea
             value={composer}
             onChange={(event) => setComposer(event.target.value)}
-            placeholder="Share something with your classmates..."
+            placeholder="แบ่งปันสิ่งที่อยากบอกเพื่อนร่วมชั้น..."
             rows={4}
             style={{
               padding: "12px 16px",
@@ -379,7 +450,7 @@ export default function StatusesPage() {
               opacity: isPublishing ? 0.75 : 1,
             }}
           >
-            {isPublishing ? "Publishing..." : "Publish"}
+            {isPublishing ? "กำลังโพสต์..." : "โพสต์"}
           </button>
         </div>
       </form>
@@ -404,7 +475,7 @@ export default function StatusesPage() {
 
       {!isLoading && statuses.length === 0 ? (
         <p style={{ fontSize: "1.05rem", color: "rgba(23,23,23,0.7)" }}>
-          No statuses yet. Be the first to start the conversation!
+          ยังไม่มีสถานะ เริ่มการสนทนาเป็นคนแรกเลย!
         </p>
       ) : null}
 
@@ -452,10 +523,10 @@ export default function StatusesPage() {
                     cursor: likePending[status._id] ? "not-allowed" : "pointer",
                   }}
                 >
-                  {status.hasLiked ? `Unlike (${likeText})` : likeText}
+                  {status.hasLiked ? `ยกเลิกถูกใจ (${likeText})` : likeText}
                 </button>
                 <span style={{ color: "rgba(23,23,23,0.6)", fontSize: "0.9rem" }}>
-                  {comments.length} comment{comments.length !== 1 ? "s" : ""}
+                  {comments.length} ความคิดเห็น
                 </span>
               </div>
 
@@ -496,14 +567,14 @@ export default function StatusesPage() {
                   }}
                 >
                   <label style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                    <span style={{ fontWeight: 600 }}>Add a comment</span>
+                    <span style={{ fontWeight: 600 }}>เพิ่มความคิดเห็น</span>
                     <textarea
                       value={draftValue}
                       onChange={(event) =>
                         setCommentDrafts((prev) => ({ ...prev, [status._id]: event.target.value }))
                       }
                       rows={3}
-                      placeholder="Share your thoughts..."
+                      placeholder="ร่วมแสดงความคิดเห็น..."
                       style={{
                         padding: "12px 16px",
                         borderRadius: "12px",
@@ -529,7 +600,7 @@ export default function StatusesPage() {
                       opacity: commentPending[status._id] ? 0.75 : 1,
                     }}
                   >
-                    {commentPending[status._id] ? "Posting..." : "Comment"}
+                    {commentPending[status._id] ? "กำลังโพสต์..." : "แสดงความคิดเห็น"}
                   </button>
                 </div>
               </div>

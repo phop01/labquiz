@@ -46,13 +46,13 @@ interface ProfileResponse {
 const quickLinks = [
   {
     href: "/members",
-    title: "Cohort directory",
-    description: "Browse classmates filtered by enrollment year.",
+    title: "รายชื่อรุ่น",
+    description: "ดูรายชื่อเพื่อนร่วมรุ่นตามปีการเข้าเรียน",
   },
   {
     href: "/statuses",
-    title: "Status board",
-    description: "Post updates, comment, and react to classmates' statuses.",
+    title: "กระดานสถานะ",
+    description: "โพสต์อัปเดต แสดงความคิดเห็น และโต้ตอบกับสถานะของเพื่อนร่วมรุ่น",
   },
 ];
 
@@ -181,35 +181,6 @@ export default function ProfilePage() {
         </button>
       </header>
 
-      <section
-        style={{
-          display: "grid",
-          gap: "20px",
-          gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-        }}
-      >
-        {quickLinks.map((card) => (
-          <Link
-            key={card.href}
-            href={card.href}
-            style={{
-              borderRadius: "20px",
-              border: "1px solid rgba(23,23,23,0.08)",
-              background: "#fff",
-              padding: "24px",
-              display: "flex",
-              flexDirection: "column",
-              gap: "12px",
-              textDecoration: "none",
-            }}
-          >
-            <h2 style={{ fontSize: "1.3rem", fontWeight: 600 }}>{card.title}</h2>
-            <p style={{ fontSize: "1rem", color: "rgba(23,23,23,0.7)", lineHeight: 1.6 }}>{card.description}</p>
-            <span style={{ fontWeight: 600, color: "rgba(48,84,150,1)" }}>Go to {card.title}</span>
-          </Link>
-        ))}
-      </section>
-
       {error ? (
         <div
           style={{
@@ -229,74 +200,14 @@ export default function ProfilePage() {
       ) : null}
 
       {profile ? (
-        <div
-          style={{
-            display: "grid",
-            gap: "24px",
-            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-          }}
-        >
-          <article
+        <>
+          <div
             style={{
-              borderRadius: "24px",
-              background: "#fff",
-              padding: "28px",
-              border: "1px solid rgba(23,23,23,0.08)",
-              display: "flex",
-              flexDirection: "column",
-              gap: "12px",
+              display: "grid",
+              gap: "24px",
+              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
             }}
           >
-            <h2 style={{ fontSize: "1.2rem", fontWeight: 600 }}>Account</h2>
-            {profile.role ? <p>Role: {profile.role}</p> : null}
-            {profile.type ? <p>Program type: {profile.type}</p> : null}
-            <p>Verification: {profile.confirmed ? "Verified" : "Pending"}</p>
-            {profile.createdAt ? (
-              <p style={{ color: "rgba(23,23,23,0.6)", fontSize: "0.95rem" }}>
-                Member since {new Date(profile.createdAt).toLocaleDateString("th-TH")}
-              </p>
-            ) : null}
-          </article>
-
-          <article
-            style={{
-              borderRadius: "24px",
-              background: "#fff",
-              padding: "28px",
-              border: "1px solid rgba(23,23,23,0.08)",
-              display: "flex",
-              flexDirection: "column",
-              gap: "12px",
-            }}
-          >
-            <h2 style={{ fontSize: "1.2rem", fontWeight: 600 }}>Education</h2>
-            {profile.education?.major ? <p>Major: {profile.education.major}</p> : null}
-            {profile.education?.enrollmentYear ? (
-              <p>Enrollment year: {profile.education.enrollmentYear}</p>
-            ) : null}
-            {profile.education?.studentId ? <p>Student ID: {profile.education.studentId}</p> : null}
-            {profile.education?.school?.name ? (
-              <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-                {profile.education.school.logo ? (
-                  <Image
-                    src={profile.education.school.logo}
-                    alt={profile.education.school.name ?? "School logo"}
-                    width={48}
-                    height={48}
-                    style={{ borderRadius: "12px", objectFit: "cover" }}
-                  />
-                ) : null}
-                <div>
-                  <p>School: {profile.education.school.name}</p>
-                  {profile.education.school.province ? (
-                    <p>Province: {profile.education.school.province}</p>
-                  ) : null}
-                </div>
-              </div>
-            ) : null}
-          </article>
-
-          {profile.education?.advisor ? (
             <article
               style={{
                 borderRadius: "24px",
@@ -308,27 +219,118 @@ export default function ProfilePage() {
                 gap: "12px",
               }}
             >
-              <h2 style={{ fontSize: "1.2rem", fontWeight: 600 }}>Advisor</h2>
-              <div style={{ display: "flex", gap: "16px", alignItems: "center" }}>
-                {profile.education.advisor.image ? (
-                  <Image
-                    src={profile.education.advisor.image}
-                    alt={profile.education.advisor.name ?? "Advisor"}
-                    width={64}
-                    height={64}
-                    style={{ borderRadius: "16px", objectFit: "cover" }}
-                  />
-                ) : null}
-                <div>
-                  <p style={{ fontWeight: 600 }}>{profile.education.advisor.name}</p>
-                  {profile.education.advisor.email ? (
-                    <p style={{ color: "rgba(23,23,23,0.7)" }}>{profile.education.advisor.email}</p>
-                  ) : null}
-                </div>
-              </div>
+              <h2 style={{ fontSize: "1.2rem", fontWeight: 600 }}>Account</h2>
+              {profile.role ? <p>Role: {profile.role}</p> : null}
+              {profile.type ? <p>Program type: {profile.type}</p> : null}
+              <p>Verification: {profile.confirmed ? "Verified" : "Pending"}</p>
+              {profile.createdAt ? (
+                <p style={{ color: "rgba(23,23,23,0.6)", fontSize: "0.95rem" }}>
+                  Member since {new Date(profile.createdAt).toLocaleDateString("th-TH")}
+                </p>
+              ) : null}
             </article>
-          ) : null}
-        </div>
+
+            <article
+              style={{
+                borderRadius: "24px",
+                background: "#fff",
+                padding: "28px",
+                border: "1px solid rgba(23,23,23,0.08)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "12px",
+              }}
+            >
+              <h2 style={{ fontSize: "1.2rem", fontWeight: 600 }}>Education</h2>
+              {profile.education?.major ? <p>Major: {profile.education.major}</p> : null}
+              {profile.education?.enrollmentYear ? (
+                <p>Enrollment year: {profile.education.enrollmentYear}</p>
+              ) : null}
+              {profile.education?.studentId ? <p>Student ID: {profile.education.studentId}</p> : null}
+              {profile.education?.school?.name ? (
+                <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+                  {profile.education.school.logo ? (
+                    <Image
+                      src={profile.education.school.logo}
+                      alt={profile.education.school.name ?? "School logo"}
+                      width={48}
+                      height={48}
+                      style={{ borderRadius: "12px", objectFit: "cover" }}
+                    />
+                  ) : null}
+                  <div>
+                    <p>School: {profile.education.school.name}</p>
+                    {profile.education.school.province ? (
+                      <p>Province: {profile.education.school.province}</p>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+            </article>
+
+            {profile.education?.advisor ? (
+              <article
+                style={{
+                  borderRadius: "24px",
+                  background: "#fff",
+                  padding: "28px",
+                  border: "1px solid rgba(23,23,23,0.08)",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
+                }}
+              >
+                <h2 style={{ fontSize: "1.2rem", fontWeight: 600 }}>Advisor</h2>
+                <div style={{ display: "flex", gap: "16px", alignItems: "center" }}>
+                  {profile.education.advisor.image ? (
+                    <Image
+                      src={profile.education.advisor.image}
+                      alt={profile.education.advisor.name ?? "Advisor"}
+                      width={64}
+                      height={64}
+                      style={{ borderRadius: "16px", objectFit: "cover" }}
+                    />
+                  ) : null}
+                  <div>
+                    <p style={{ fontWeight: 600 }}>{profile.education.advisor.name}</p>
+                    {profile.education.advisor.email ? (
+                      <p style={{ color: "rgba(23,23,23,0.7)" }}>{profile.education.advisor.email}</p>
+                    ) : null}
+                  </div>
+                </div>
+              </article>
+            ) : null}
+          </div>
+
+          <section
+            style={{
+              display: "grid",
+              gap: "20px",
+              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+            }}
+          >
+            {quickLinks.map((card) => (
+              <Link
+                key={card.href}
+                href={card.href}
+                style={{
+                  borderRadius: "20px",
+                  border: "1px solid rgba(23,23,23,0.08)",
+                  background: "#fff",
+                  padding: "24px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
+                  textDecoration: "none",
+                }}
+              >
+                <h2 style={{ fontSize: "1.3rem", fontWeight: 600 }}>{card.title}</h2>
+                <p style={{ fontSize: "1rem", color: "rgba(23,23,23,0.7)", lineHeight: 1.6 }}>{card.description}</p>
+                <span style={{ fontWeight: 600, color: "rgba(48,84,150,1)" }}>ไปที่ {card.title}</span>
+              </Link>
+            ))}
+          </section>
+        </>
       ) : null}
     </section>
   );
