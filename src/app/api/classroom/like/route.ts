@@ -1,5 +1,35 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { buildApiUrl } from "@/lib/config";
+
+interface LikePayload {
+  statusId?: string;
+  action?: "like" | "unlike";
+}
+
+async function forwardLike({
+  endpoint,
+  method,
+  authorization,
+  apiKey,
+  body,
+}: {
+  endpoint: string;
+  method: "POST" | "DELETE";
+  authorization: string;
+  apiKey: string;
+  body: string;
+}) {
+  return fetch(buildApiUrl(endpoint), {
+    method,
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      Authorization: authorization,
+      "x-api-key": apiKey,
+    },
+    body,
+  });
+}
 
 export async function POST(request: NextRequest) {
   const apiKey = process.env.CIS_API_KEY;
@@ -18,17 +48,41 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "Authentication token is missing" }, { status: 401 });
   }
 
+  let payload: LikePayload | undefined;
+
   try {
-    const upstreamResponse = await fetch(buildApiUrl("/like"), {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        Authorization: authorization,
-        "x-api-key": apiKey,
-      },
-      body: await request.text(),
+    payload = await request.json();
+  } catch (error) {
+    console.error("classroom/like failed", "invalid JSON body", error);
+    return NextResponse.json({ message: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const statusId = payload?.statusId;
+  if (!statusId || typeof statusId !== "string") {
+    return NextResponse.json({ message: "statusId is required" }, { status: 400 });
+  }
+
+  const action = payload?.action === "unlike" ? "unlike" : "like";
+  const forwardedBody = JSON.stringify({ statusId });
+
+  try {
+    let upstreamResponse = await forwardLike({
+      endpoint: "/like",
+      method: action === "unlike" ? "DELETE" : "POST",
+      authorization,
+      apiKey,
+      body: forwardedBody,
     });
+
+    if (action === "unlike" && (upstreamResponse.status === 404 || upstreamResponse.status === 405)) {
+      upstreamResponse = await forwardLike({
+        endpoint: "/unlike",
+        method: "POST",
+        authorization,
+        apiKey,
+        body: forwardedBody,
+      });
+    }
 
     const rawBody = await upstreamResponse.text();
     let parsedBody: unknown = rawBody;

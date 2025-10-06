@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { apiRequest } from "@/lib/api-client";
 
@@ -111,35 +111,40 @@ export default function StatusesPage() {
   const currentUserId = user?._id;
   const currentUserEmail = user?.email;
   const isAuthenticated = useMemo(() => isReady && Boolean(user), [isReady, user]);
+  const refreshStatuses = useCallback(async () => {
+    if (!isAuthenticated) {
+      setStatuses([]);
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await apiRequest<StatusListResponse>({
+        path: "/classroom/status",
+        method: "GET",
+      });
+      const normalized = (response.data ?? []).map((item) =>
+        normalizeStatus(item, currentUserId, currentUserEmail),
+      );
+      setStatuses(normalized);
+    } catch (apiError) {
+      const message =
+        typeof apiError === "object" && apiError !== null && "message" in apiError
+          ? String((apiError as { message: unknown }).message)
+          : "Unable to load status feed";
+      setError(message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isAuthenticated, currentUserId, currentUserEmail]);
+
 
   useEffect(() => {
-    if (!isAuthenticated) return;
-
-    const fetchStatuses = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const response = await apiRequest<StatusListResponse>({
-          path: "/classroom/status",
-          method: "GET",
-        });
-        const normalized = response.data.map((item) =>
-          normalizeStatus(item, currentUserId, currentUserEmail),
-        );
-        setStatuses(normalized);
-      } catch (apiError) {
-        const message =
-          typeof apiError === "object" && apiError !== null && "message" in apiError
-            ? String((apiError as { message: unknown }).message)
-            : "Unable to load status feed";
-        setError(message);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchStatuses();
-  }, [isAuthenticated, currentUserId, currentUserEmail]);
+    void refreshStatuses();
+  }, [refreshStatuses]);
 
   const likeLabel = (status: StatusItem) => {
     const count = status.likeCount ?? status.like?.length ?? 0;
@@ -164,6 +169,11 @@ export default function StatusesPage() {
         method: "POST",
         body: { content: composer.trim() },
       });
+      if (!response.data) {
+        await refreshStatuses();
+        return;
+      }
+
       const normalized = normalizeStatus(
         response.data,
         currentUserId,
@@ -198,6 +208,11 @@ export default function StatusesPage() {
           statusId,
         },
       });
+      if (!response.data) {
+        await refreshStatuses();
+        return;
+      }
+
       const normalized = normalizeStatus(
         response.data,
         currentUserId,
@@ -238,10 +253,15 @@ export default function StatusesPage() {
 
     try {
       const response = await apiRequest<StatusMutationResponse>({
-        path: isCurrentlyLiked ? "/classroom/unlike" : "/classroom/like",
+        path: "/classroom/like",
         method: "POST",
-        body: { statusId },
+        body: { statusId, action: isCurrentlyLiked ? "unlike" : "like" },
       });
+      if (!response.data) {
+        await refreshStatuses();
+        return;
+      }
+
       const normalized = normalizeStatus(
         response.data,
         currentUserId,
