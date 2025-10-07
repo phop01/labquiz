@@ -1,5 +1,6 @@
-﻿import { buildApiUrl, buildAppApiUrl } from "./config";
+import { buildApiUrl, buildAppApiUrl } from "./config";
 import { getAuthToken } from "./auth-storage";
+import { getCisApiKey } from "./cis-api-key";
 
 export type ApiTarget = "app" | "external";
 
@@ -31,6 +32,11 @@ export async function apiRequest<TResponse>(options: RequestOptions): Promise<TR
 
   const requestHeaders = new Headers(headers);
   requestHeaders.set("Accept", "application/json");
+
+  const cisApiKey = getCisApiKey();
+  if (cisApiKey) {
+    requestHeaders.set("x-cis-api-key", cisApiKey);
+  }
 
   const finalInit: RequestInit = {
     method,

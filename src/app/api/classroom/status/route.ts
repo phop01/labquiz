@@ -1,11 +1,11 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { buildApiUrl } from "@/lib/config";
 
 async function forwardRequest(
   request: NextRequest,
   init?: RequestInit,
 ) {
-  const apiKey = process.env.CIS_API_KEY;
+  const apiKey = request.headers.get("x-cis-api-key") ?? process.env.CIS_API_KEY;
 
   if (!apiKey) {
     console.error("classroom/status failed", "missing API key configuration");

@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { buildApiUrl } from "@/lib/config";
 
 interface SignInPayload {
@@ -8,7 +8,7 @@ interface SignInPayload {
 
 export async function POST(request: Request) {
   const payload = (await request.json()) as SignInPayload;
-  const apiKey = process.env.CIS_API_KEY;
+  const apiKey = request.headers.get("x-cis-api-key") ?? process.env.CIS_API_KEY;
 
   if (!apiKey) {
     console.error("signin failed", "missing API key configuration");

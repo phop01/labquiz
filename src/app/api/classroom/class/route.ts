@@ -1,8 +1,8 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { buildApiUrl } from "@/lib/config";
 
 export async function GET(request: NextRequest) {
-  const apiKey = process.env.CIS_API_KEY;
+  const apiKey = request.headers.get("x-cis-api-key") ?? process.env.CIS_API_KEY;
 
   if (!apiKey) {
     console.error("classroom/class failed", "missing API key configuration");

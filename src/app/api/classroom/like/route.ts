@@ -32,7 +32,7 @@ async function forwardLike({
 }
 
 export async function POST(request: NextRequest) {
-  const apiKey = process.env.CIS_API_KEY;
+  const apiKey = request.headers.get("x-cis-api-key") ?? process.env.CIS_API_KEY;
 
   if (!apiKey) {
     console.error("classroom/like failed", "missing API key configuration");
